@@ -20,8 +20,13 @@ void CtrlRaceSpeedo::Create(Page& page, u32 index, u32 count) {
         page.AddControl(index + i, *som, 0);
         char variant[0x20];
         int pos = i;
-        if(count == 1 && Settings::Mgr::Get().GetSettingValue(Settings::SETTINGSTYPE_RACE, SETTINGRACE_RADIO_SOM) == RACESETTING_SOM_RIGHT) pos = 1;
-        snprintf(variant, 0x20, "Speedo_%1d_%1d", speedoType, pos);
+        if(Settings::Mgr::Get().GetSettingValue(Settings::SETTINGSTYPE_RACE, SETTINGRACE_RADIO_SOM) == RACESETTING_SOM_LEFT){
+            if(count == 1) pos = 0;           
+            snprintf(variant, 0x20, "Speedo_%1d_%1d", speedoType, pos);
+        } else if(Settings::Mgr::Get().GetSettingValue(Settings::SETTINGSTYPE_RACE, SETTINGRACE_RADIO_SOM) == RACESETTING_SOM_RIGHT){
+            if(count == 1) pos = 1;
+            snprintf(variant, 0x20, "SpeedoR_%1d_%1d", speedoType, pos);
+        }
         som->Load(variant, i);
     }
 }
@@ -41,7 +46,12 @@ void CtrlRaceSpeedo::Load(const char* variant, u8 id) {
         nullptr
     };
 
-    loader.Load(UI::raceFolder, "PULSpeedo", variant, anims);
+    //brlyt subfile loading
+    if (Settings::Mgr::Get().GetSettingValue(Settings::SETTINGSTYPE_RACE, SETTINGRACE_RADIO_SOM) == RACESETTING_SOM_LEFT) {
+        loader.Load(UI::raceFolder, "PULSpeedo", variant, anims);
+    } else if (Settings::Mgr::Get().GetSettingValue(Settings::SETTINGSTYPE_RACE, SETTINGRACE_RADIO_SOM) == RACESETTING_SOM_RIGHT) {
+        loader.Load(UI::raceFolder, "PULSpeedo_Right", variant, anims);
+    }
 
     this->Animate();
     return;
@@ -77,34 +87,49 @@ void CtrlRaceSpeedo::OnUpdate() {
     const u32 speedValue = static_cast<u32>(speed * 1000.0f);
 
     //10 means empty, 11 dot
-    u32 hundreds = speedValue % 1000000 / 100000;
-    u32 tens = speedValue % 100000 / 10000;
-    u32 units = speedValue % 10000 / 1000;
-    u32 dot = digits >= 1 ? 11 : 10;
-    u32 tenths = digits >= 1 ? speedValue % 1000 / 100 : 10;
-    u32 hundredths = digits >= 2 ? speedValue % 100 / 10 : 10;
-    u32 thousandths = digits == 3 ? speedValue % 10 / 1 : 10;
+    const u32 empty = 10;
+    const u32 dot = 11;
+    const u8 somPosition = Settings::Mgr::Get().GetSettingValue(Settings::SETTINGSTYPE_RACE, SETTINGRACE_RADIO_SOM);
 
-    if(speedValue < 10000) { //shift everything by 2 to the left
-        hundreds = units;
-        tens = dot;
-        units = tenths;
-        dot = hundredths;
-        tenths = thousandths;
-        hundredths = 10;
-        thousandths = 10;
-    }
-    else if(speedValue < 100000) {
-        hundreds = tens;
-        tens = units;
-        units = dot;
-        dot = tenths;
-        tenths = hundredths;
-        hundredths = thousandths;
-        thousandths = 10;
+    u32 speedDigits[7] = { empty, empty, empty, empty, empty, empty, empty };
+    if(digits <= 3 && (somPosition == RACESETTING_SOM_LEFT || somPosition == RACESETTING_SOM_RIGHT)) {
+        const u32 rawHundreds = speedValue / 100000 % 10;
+        const u32 rawTens = speedValue / 10000 % 10;
+        const u32 rawUnits = speedValue / 1000 % 10;
+        const u32 decimals[3] = {
+            speedValue / 100 % 10,
+            speedValue / 10 % 10,
+            speedValue % 10
+        };
+
+        u32 integerDigits[3];
+        u32 integerDigitCount;
+        if(speedValue < 10000) {
+            integerDigits[0] = rawUnits;
+            integerDigitCount = 1;
+        }
+        else if(speedValue < 100000) {
+            integerDigits[0] = rawTens;
+            integerDigits[1] = rawUnits;
+            integerDigitCount = 2;
+        }
+        else {
+            integerDigits[0] = rawHundreds;
+            integerDigits[1] = rawTens;
+            integerDigits[2] = rawUnits;
+            integerDigitCount = 3;
+        }
+
+        const u32 visibleDigitCount = integerDigitCount + (digits == 0 ? 0 : digits + 1);
+        u32 out = somPosition == RACESETTING_SOM_RIGHT ? 7 - visibleDigitCount : 0;
+        for(u32 i = 0; i < integerDigitCount; ++i) speedDigits[out++] = integerDigits[i];
+        if(digits > 0) {
+            speedDigits[out++] = dot;
+            for(u32 i = 0; i < digits; ++i) speedDigits[out++] = decimals[i];
+        }
     }
 
-    SpeedArg args(hundreds, tens, units, dot, tenths, hundredths, thousandths);
+    SpeedArg args(speedDigits[0], speedDigits[1], speedDigits[2], speedDigits[3], speedDigits[4], speedDigits[5], speedDigits[6]);
     this->Animate(&args);
     return;
 }
