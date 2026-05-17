@@ -23,7 +23,7 @@ MYDIRS = []
 
 RIIVO = ""
 
-COMPILER = "C:/Program Files (x86)/Freescale/CW for MPC55xx and MPC56xx 2.10/PowerPC_EABI_Tools/Command_Line_Tools/mwcceppc.exe"
+COMPILER = "./cw/mwcceppc.exe"
 FLAGS = (f'-I- -i "{ENGINE}" -i "{GAMESOURCE}" -i "{PULSAR}" ' +
 		 '-opt all -inline auto -enum int -fp hard -sdata 0 -sdata2 0 -maxerrors 1 -func_align 4 -MD -gccdep')
 LINKER = "./KamekLinker/Kamek.exe"
